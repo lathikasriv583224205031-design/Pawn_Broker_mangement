@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'SMS அனுப்பிய வரலாறு' if current_lang == 'ta' else 'SMS Sent History' }} - Pawn Broker</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-hover: #1e40af;
+            --success: #059669;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: var(--bg); color: var(--text-dark); padding-bottom: 40px; }
+
+        /* Navigation Bar */
+        .navbar {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            padding: 14px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            color: white;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .nav-brand { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+        .nav-links { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        
+        /* Language Switcher */
+        .lang-switch {
+            display: inline-flex;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .lang-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .lang-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+        .lang-btn.active {
+            background: #2563eb;
+            color: white;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #475569; color: white; }
+        .btn-secondary:hover { background: #334155; }
+
+        .container { max-width: 1250px; margin: 24px auto; padding: 0 20px; }
+
+        .header-card {
+            background: white;
+            padding: 20px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header-title h2 { font-size: 1.4rem; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+        .header-title p { font-size: 0.9rem; color: var(--text-muted); margin-top: 4px; }
+
+        /* Search input */
+        .search-box {
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            min-width: 250px;
+        }
+
+        /* Table Card */
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            overflow: hidden;
+        }
+        .table-responsive { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+        thead { background: #f1f5f9; border-bottom: 2px solid var(--border); }
+        th { padding: 12px 16px; font-weight: 700; color: #334155; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.5px; }
+        td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:hover { background: #f8fafc; }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge-success { background: #dcfce7; color: #15803d; }
+        .badge-failed { background: #fee2e2; color: #b91c1c; }
+        .badge-lang-ta { background: #fef3c7; color: #92400e; }
+        .badge-lang-en { background: #e0f2fe; color: #0369a1; }
+
+        .msg-text {
+            max-width: 420px;
+            word-break: break-word;
+            font-size: 0.85rem;
+            color: #334155;
+            line-height: 1.4;
+        }
+        .error-note {
+            font-size: 0.78rem;
+            color: #dc2626;
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="nav-brand">
+        🏦 <span>{{ 'பெரிய கருப்பர் பேங்கர்' if current_lang == 'ta' else 'Periya Karuppar Banker' }}</span>
+    </div>
+    
+    <div class="nav-links">
+        <a href="/dashboard" class="btn btn-secondary">
+            ⬅️ {{ 'முதன்மை பக்கத்திற்கு செல்' if current_lang == 'ta' else 'Back to Dashboard' }}
+        </a>
+
+        <!-- Separate Language Buttons -->
+        <div class="lang-switch">
+            <a href="/set_lang/en" class="lang-btn {% if current_lang == 'en' %}active{% endif %}" title="Switch to English">
+                🇬🇧 English
+            </a>
+            <a href="/set_lang/ta" class="lang-btn {% if current_lang == 'ta' %}active{% endif %}" title="தமிழுக்கு மாறுக">
+                🇮🇳 தமிழ்
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="header-card">
+        <div class="header-title">
+            <h2>📜 {{ 'SMS அனுப்பிய வரலாறு' if current_lang == 'ta' else 'Sent SMS Message History' }}</h2>
+            <p>{{ 'வாடிக்கையாளர்களுக்கு அனுப்பப்பட்ட அனைத்து SMS பதிவுகளும் இங்கு சேமிக்கப்பட்டுள்ளன.' if current_lang == 'ta' else 'Complete log of all SMS notifications sent to customers.' }}</p>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+            <input type="text" id="filterInput" onkeyup="filterTable()" class="search-box" placeholder="{{ 'வாடிக்கையாளர் பெயரைத் தேடுக...' if current_lang == 'ta' else 'Filter by name or phone...' }}">
+            
+            <form method="POST" action="/sms_history/clear" onsubmit="return confirm('{{ 'அனைத்து SMS வரலாற்றையும் அழிக்க விரும்புகிறீர்களா?' if current_lang == 'ta' else 'Are you sure you want to clear all SMS history?' }}')">
+                <button type="submit" class="btn btn-danger" style="font-size:0.8rem; padding: 8px 12px;">
+                    🗑️ {{ 'வரலாற்றை அழி' if current_lang == 'ta' else 'Clear Log' }}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table id="smsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>{{ 'வாடிக்கையாளர்' if current_lang == 'ta' else 'Customer' }}</th>
+                        <th>{{ 'தொலைபேசி' if current_lang == 'ta' else 'Phone' }}</th>
+                        <th>{{ 'மொழி' if current_lang == 'ta' else 'Language' }}</th>
+                        <th>{{ 'அனுப்பிய நேரம்' if current_lang == 'ta' else 'Sent Date & Time' }}</th>
+                        <th>{{ 'செய்தி விவரம்' if current_lang == 'ta' else 'Message Body' }}</th>
+                        <th>{{ 'நிலை' if current_lang == 'ta' else 'Status' }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if history %}
+                        {% for row in history %}
+                        <tr>
+                            <td><strong>{{ row[0] }}</strong></td>
+                            <td>
+                                <strong>{{ row[2] }}</strong>
+                                {% if row[1] %}
+                                <div style="font-size:0.75rem; color:#64748b;">Loan ID: #{{ row[1] }}</div>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ row[3] }}</code></td>
+                            <td>
+                                {% if row[5] == 'Tamil' or row[5] == 'ta' %}
+                                <span class="badge badge-lang-ta">🇮🇳 தமிழ்</span>
+                                {% else %}
+                                <span class="badge badge-lang-en">🇬🇧 English</span>
+                                {% endif %}
+                            </td>
+                            <td style="white-space: nowrap; color: #475569; font-size: 0.82rem;">
+                                🕒 {{ row[6] }}
+                            </td>
+                            <td>
+                                <div class="msg-text">{{ row[4] }}</div>
+                                {% if row[8] and row[7] == 'Failed' %}
+                                <div class="error-note">⚠️ {{ row[8] }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row[7] == 'Success' %}
+                                <span class="badge badge-success">✓ {{ 'வெற்றி' if current_lang == 'ta' else 'Sent' }}</span>
+                                {% else %}
+                                <span class="badge badge-danger">✗ {{ 'தோல்வி' if current_lang == 'ta' else 'Failed' }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                📭 {{ 'இதுவரை SMS அனுப்பப்பட்ட பதிவுகள் இல்லை.' if current_lang == 'ta' else 'No SMS history recorded yet.' }}
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterTable() {
+    let input = document.getElementById("filterInput");
+    let filter = input.value.toLowerCase();
+    let table = document.getElementById("smsTable");
+    let trs = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+
+    for (let i = 0; i < trs.length; i++) {
+        let text = trs[i].innerText.toLowerCase();
+        trs[i].style.display = text.indexOf(filter) > -1 ? "" : "none";
+    }
+}
+</script>
+
+</body>
+</html>

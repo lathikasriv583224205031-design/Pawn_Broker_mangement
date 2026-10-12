@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ 'வாடிக்கையாளர் விவரம் திருத்து' if current_lang == 'ta' else 'Edit Customer Loan' }} - Pawn Broker</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --success: #059669;
+            --warning: #d97706;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border: #cbd5e1;
+            --radius: 10px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); color: var(--text-dark); padding-bottom: 50px; }
+
+        .navbar {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            padding: 12px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .nav-brand { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .nav-links { display: flex; align-items: center; gap: 10px; }
+
+        .lang-switch {
+            display: inline-flex;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .lang-btn {
+            padding: 5px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .lang-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+        .lang-btn.active { background: #2563eb; color: white; }
+
+        .btn-back {
+            background: #475569;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .btn-back:hover { background: #334155; }
+
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .form-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 30px 35px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+
+        .form-header {
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .form-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px 20px;
+        }
+        .form-group-full { grid-column: 1 / -1; }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: #f8fafc;
+            color: var(--text-dark);
+            transition: all 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            background: white;
+            border-color: #2563eb;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+
+        .calc-preview-card {
+            grid-column: 1 / -1;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 5px;
+        }
+        .calc-box-title { font-size: 0.78rem; text-transform: uppercase; color: #1e40af; font-weight: 700; }
+        .calc-box-val { font-size: 1.25rem; font-weight: 700; color: #1d4ed8; margin-top: 4px; }
+
+        .btn-submit {
+            background: #d97706;
+            color: white;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .btn-submit:hover {
+            background: #b45309;
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 650px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .calc-preview-card { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="nav-brand">
+        🏦 <span>{{ 'பெரிய கருப்பர் பேங்கர்' if current_lang == 'ta' else 'Periya Karuppar Banker' }}</span>
+    </div>
+    <div class="nav-links">
+        <a href="/dashboard" class="btn-back">⬅️ {{ 'திரும்பச் செல்' if current_lang == 'ta' else 'Back' }}</a>
+        <div class="lang-switch">
+            <a href="/set_lang/en" class="lang-btn {% if current_lang == 'en' %}active{% endif %}">🇬🇧 EN</a>
+            <a href="/set_lang/ta" class="lang-btn {% if current_lang == 'ta' %}active{% endif %}">🇮🇳 தமிழ்</a>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="form-card">
+        <div class="form-header">
+            <div class="form-title">
+                ✏️ {{ 'வாடிக்கையாளர் கடன் விவரம் திருத்து' if current_lang == 'ta' else 'Edit Customer Loan Record' }} (#{{ row[0] }})
+            </div>
+        </div>
+
+        <form method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>👤 {{ 'வாடிக்கையாளர் பெயர் *' if current_lang == 'ta' else 'Customer Name *' }}</label>
+                    <input name="name" value="{{ row[1] if row[1] is not none else '' }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label>📱 {{ 'தொலைபேசி எண்' if current_lang == 'ta' else 'Phone Number' }}</label>
+                    <input name="phone" value="{{ row[12] if row[12] is not none else '' }}" maxlength="15">
+                </div>
+
+                <div class="form-group form-group-full">
+                    <label>📍 {{ 'முகவரி' if current_lang == 'ta' else 'Address' }}</label>
+                    <input name="address" value="{{ row[13] if row[13] is not none else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label>💍 {{ 'அடகு பொருள்' if current_lang == 'ta' else 'Item Description' }}</label>
+                    <input name="item" value="{{ row[2] if row[2] is not none else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label>⚖️ {{ 'தங்கத்தின் எடை (கிராம்)' if current_lang == 'ta' else 'Gold Weight (Grams)' }}</label>
+                    <input name="gold" type="number" step="0.01" value="{{ row[9] if row[9] is not none else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label>💰 {{ 'அசல் கடன் தொகை (₹) *' if current_lang == 'ta' else 'Principal Amount (₹) *' }}</label>
+                    <input name="amount" type="number" step="0.01" id="amount" value="{{ row[3] if row[3] is not none else '' }}" oninput="calc()" required>
+                </div>
+
+                <div class="form-group">
+                    <label>📈 {{ 'வட்டி வீதம் (%) *' if current_lang == 'ta' else 'Interest Rate (%) *' }}</label>
+                    <input name="rate" type="number" step="0.01" id="rate" value="{{ row[4] if row[4] is not none else '' }}" oninput="calc()" required>
+                </div>
+
+                <div class="form-group">
+                    <label>⏳ {{ 'கால அளவு (மாதங்கள்) *' if current_lang == 'ta' else 'Duration (Months) *' }}</label>
+                    <input name="months" type="number" id="months" value="{{ row[5] if row[5] is not none else '' }}" oninput="calc()" required>
+                </div>
+
+                <div class="form-group">
+                    <label>➕ {{ 'கூடுதல் கட்டணம் (₹)' if current_lang == 'ta' else 'Manual Extra Charges (₹)' }}</label>
+                    <input name="manual_extra" type="number" step="0.01" id="manual_extra" value="{{ row[11] if row[11] is not none else '0' }}" oninput="calc()">
+                </div>
+
+                <div class="calc-preview-card">
+                    <div>
+                        <div class="calc-box-title">{{ 'வட்டி தொகை' if current_lang == 'ta' else 'Interest Amount' }}</div>
+                        <div class="calc-box-val" id="disp_interest">₹{{ row[6] }}</div>
+                        <input type="hidden" name="interest_amount" id="interest_amount" value="{{ row[6] }}">
+                    </div>
+                    <div>
+                        <div class="calc-box-title">{{ 'மொத்த திருப்பிச் செலுத்தும் தொகை' if current_lang == 'ta' else 'Total Due Amount' }}</div>
+                        <div class="calc-box-val" id="disp_total">₹{{ row[7] }}</div>
+                        <input type="hidden" name="total_amount" id="total_amount" value="{{ row[7] }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>📅 {{ 'கெடு தேதி' if current_lang == 'ta' else 'Due Date' }}</label>
+                    <input type="date" name="due_date" id="due_date" value="{{ row[8] if row[8] is not none else '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label>📌 {{ 'கடன் நிலை' if current_lang == 'ta' else 'Loan Status' }}</label>
+                    <select name="status">
+                        <option value="Active" {% if row[10] == 'Active' %}selected{% endif %}>{{ 'செயலில் (Active)' if current_lang == 'ta' else 'Active' }}</option>
+                        <option value="Returned" {% if row[10] == 'Returned' %}selected{% endif %}>{{ 'திரும்பப் பெறப்பட்டது (Returned)' if current_lang == 'ta' else 'Returned' }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+                💾 {{ 'விவரங்களைப் புதுப்பி' if current_lang == 'ta' else 'Update Loan Record' }}
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function calc() {
+    let amt = parseFloat(document.getElementById('amount').value) || 0;
+    let rt = parseFloat(document.getElementById('rate').value) || 0;
+    let mo = parseFloat(document.getElementById('months').value) || 0;
+    let extra = parseFloat(document.getElementById('manual_extra').value) || 0;
+    
+    let interest = (amt * rt * mo) / 100;
+    let total = amt + interest + extra;
+    
+    document.getElementById('interest_amount').value = interest.toFixed(2);
+    document.getElementById('total_amount').value = total.toFixed(2);
+    
+    document.getElementById('disp_interest').innerText = '₹' + interest.toLocaleString('en-IN', {minimumFractionDigits: 2});
+    document.getElementById('disp_total').innerText = '₹' + total.toLocaleString('en-IN', {minimumFractionDigits: 2});
+}
+</script>
+
+</body>
+</html>

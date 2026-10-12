@@ -1,0 +1,15 @@
+# Python bytecode & cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+pyvenv.cfg
+
+# Local database and secret configs
+twilio_config.py
+pawn.db
+sms_log.txt
