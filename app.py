@@ -8,12 +8,105 @@ import os
 import sys
 import importlib
 import requests
+import base64
+import tempfile
+import shutil
 from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
-app = Flask(__name__)
-app.secret_key = "secret123"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+
+# On Vercel serverless environment, local filesystem is read-only except /tmp
+if IS_VERCEL:
+    DB_PATH = os.path.join(tempfile.gettempdir(), "pawn.db")
+else:
+    DB_PATH = os.path.join(BASE_DIR, "pawn.db")
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static")
+)
+app.secret_key = os.environ.get("SECRET_KEY", "secret123")
+
+def init_db():
+    bundled_db = os.path.join(BASE_DIR, "pawn.db")
+    if IS_VERCEL and os.path.exists(bundled_db) and not os.path.exists(DB_PATH):
+        try:
+            shutil.copy2(bundled_db, DB_PATH)
+        except Exception as e:
+            print("Notice: could not copy bundled DB:", e)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT,
+        password TEXT
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS loans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT,
+        item TEXT,
+        gold_weight REAL,
+        amount REAL,
+        interest_rate REAL,
+        months INTEGER,
+        extra_amount REAL,
+        total_amount REAL,
+        due_date TEXT,
+        status TEXT DEFAULT 'Active',
+        manual_extra REAL DEFAULT 0,
+        phone_number TEXT DEFAULT '',
+        address TEXT DEFAULT '',
+        last_msg_date TEXT DEFAULT ''
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sms_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        loan_id INTEGER,
+        customer_name TEXT,
+        phone_number TEXT,
+        message TEXT,
+        language TEXT,
+        sent_at TEXT,
+        status TEXT,
+        error_details TEXT
+    )
+    """)
+    # Ensure default admin user exists
+    cursor.execute("SELECT id FROM users WHERE username='velu'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO users (username, password) VALUES ('velu', '86088')")
+
+    conn.commit()
+    conn.close()
+
+# Initialize DB
+try:
+    init_db()
+except Exception as e:
+    print("Database init notice:", e)
+
+def get_db():
+    if not os.path.exists(DB_PATH):
+        init_db()
+    return sqlite3.connect(DB_PATH)
+
+def log_sms(message):
+    print("SMS Log:", message)
+    try:
+        log_path = os.path.join(tempfile.gettempdir() if IS_VERCEL else BASE_DIR, "sms_log.txt")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(message + "\n")
+    except Exception:
+        pass
 
 from requests.auth import HTTPBasicAuth
 
@@ -47,9 +140,7 @@ def send_sms(to_phone, message):
         account_sid in ['your_account_sid', ''] or 
         from_phone in ['your_twilio_phone_number', '']):
         err = "Twilio credentials not configured. Please update TWILIO_AUTH_TOKEN in twilio_config.py."
-        print("SMS Error:", err)
-        with open("sms_log.txt", "a", encoding="utf-8") as f:
-            f.write(f"Config Error: {err}\n")
+        log_sms(f"Config Error: {err}")
         return False, err
 
     try:
@@ -78,15 +169,11 @@ def send_sms(to_phone, message):
             except Exception:
                 error_msg = response.text
 
-            with open("sms_log.txt", "a", encoding="utf-8") as f:
-                f.write(f"Twilio Error: {response.text}\n")
-            print("Twilio Error:", response.text)
+            log_sms(f"Twilio Error: {response.text}")
             return False, error_msg
             
     except Exception as e:
-        with open("sms_log.txt", "a", encoding="utf-8") as f:
-            f.write(f"SMS Error: {e}\n")
-        print("SMS Error:", e)
+        log_sms(f"SMS Error: {e}")
         return False, str(e)
 
 def calculate(amount, rate, months, manual_extra=0):
@@ -130,7 +217,7 @@ def login():
         user = request.form["username"]
         pwd = request.form["password"]
 
-        conn = sqlite3.connect("pawn.db")
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (user,pwd))
         data = cursor.fetchone()
@@ -149,7 +236,7 @@ def dashboard():
 
     month_filter = request.args.get("month_filter")
 
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     if month_filter:
@@ -191,30 +278,38 @@ def dashboard():
     cursor.execute("SELECT * FROM sms_history ORDER BY id DESC LIMIT 8")
     recent_sms = cursor.fetchall()
 
-    # Chart
-    if not os.path.exists("static"):
-        os.makedirs("static")
-
+    # Chart generation (in-memory for serverless/read-only compatibility)
     months_labels = [row[0] if row[0] else 'Unknown' for row in month_summary]
     monthly_amounts = [row[3] if row[3] else 0 for row in month_summary]
 
-    if months_labels:
-        plt.figure()
-        plt.bar(months_labels, monthly_amounts, color='#3498db')
-        plt.xlabel('Month')
-        plt.ylabel('Total Amount')
-        plt.title('Month-wise Loan Summary')
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.savefig("static/chart.png")
+    chart_url = ""
+    try:
+        plt.figure(figsize=(6, 4))
+        if months_labels:
+            plt.bar(months_labels, monthly_amounts, color='#3498db')
+            plt.xlabel('Month')
+            plt.ylabel('Total Amount')
+            plt.title('Month-wise Loan Summary')
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+        img_buf = BytesIO()
+        plt.savefig(img_buf, format='png', bbox_inches='tight')
         plt.close()
-    else:
-        plt.figure()
-        plt.savefig("static/chart.png")
-        plt.close()
+        img_buf.seek(0)
+        chart_url = "data:image/png;base64," + base64.b64encode(img_buf.getvalue()).decode('utf-8')
+
+        # If not running on Vercel, save to static for local caching
+        if not IS_VERCEL:
+            static_dir = os.path.join(BASE_DIR, "static")
+            if not os.path.exists(static_dir):
+                os.makedirs(static_dir, exist_ok=True)
+            with open(os.path.join(static_dir, "chart.png"), "wb") as f:
+                f.write(img_buf.getvalue())
+    except Exception as e:
+        print("Chart generation error:", e)
 
     conn.close()
-    return render_template("dashboard.html", data=processed_data, month_summary=month_summary, month_filter=month_filter, recent_sms=recent_sms)
+    return render_template("dashboard.html", data=processed_data, month_summary=month_summary, month_filter=month_filter, recent_sms=recent_sms, chart_url=chart_url)
 
 @app.route("/add", methods=["GET","POST"])
 def add():
@@ -240,7 +335,7 @@ def add():
         if request.form.get("due_date"):
             due = request.form.get("due_date")
 
-        conn = sqlite3.connect("pawn.db")
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute("""
         INSERT INTO loans (customer_name,item,gold_weight,amount,interest_rate,months,extra_amount,total_amount,due_date,status,manual_extra,phone_number,address)
@@ -257,7 +352,7 @@ def add():
 def search():
     name = request.form.get("search", "")
 
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM loans WHERE customer_name LIKE ? OR status LIKE ?", ('%'+name+'%', '%'+name+'%'))
     data = cursor.fetchall()
@@ -299,7 +394,7 @@ def search():
 
 @app.route("/delete/<int:id>")
 def delete(id):
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM loans WHERE id=?", (id,))
     conn.commit()
@@ -308,7 +403,7 @@ def delete(id):
 
 @app.route("/edit/<int:id>", methods=["GET","POST"])
 def edit(id):
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     if request.method == "POST":
@@ -359,7 +454,7 @@ def customer_pdf(id):
     if "user" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM loans WHERE id=?", (id,))
@@ -431,7 +526,7 @@ def logout():
 @app.route("/send_sms/<int:id>")
 def send_reminder_sms(id):
     lang = request.args.get('lang', session.get('lang', 'en'))
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT customer_name, item, total_amount, due_date, phone_number FROM loans WHERE id=?", (id,))
     data = cursor.fetchone()
@@ -474,7 +569,7 @@ def send_reminder_sms(id):
 @app.route("/mass_warn")
 def mass_warn():
     lang = request.args.get('lang', session.get('lang', 'en'))
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
     
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
@@ -530,7 +625,7 @@ def sms_history():
     if "user" not in session:
         return redirect("/")
     
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM sms_history ORDER BY id DESC")
     history_data = cursor.fetchall()
@@ -542,7 +637,7 @@ def sms_history():
 def clear_sms_history():
     if "user" not in session:
         return redirect("/")
-    conn = sqlite3.connect("pawn.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM sms_history")
     conn.commit()

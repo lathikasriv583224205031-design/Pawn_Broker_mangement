@@ -649,7 +649,7 @@
                 </div>
             </div>
             <div style="padding: 15px; display:flex; justify-content:center; align-items:center;">
-                <img src="{{ url_for('static', filename='chart.png') }}" alt="Monthly Chart" style="max-width: 100%; height: auto; border-radius: 8px;">
+                <img src="{{ chart_url if chart_url else url_for('static', filename='chart.png') }}" alt="Monthly Chart" style="max-width: 100%; height: auto; border-radius: 8px;">
             </div>
         </div>
     </div>

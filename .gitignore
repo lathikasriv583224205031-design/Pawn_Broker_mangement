@@ -11,5 +11,5 @@ pyvenv.cfg
 
 # Local database and secret configs
 twilio_config.py
-pawn.db
+# pawn.db (tracked as seed database)
 sms_log.txt
